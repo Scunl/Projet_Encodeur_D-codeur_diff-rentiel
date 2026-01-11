@@ -1,27 +1,226 @@
+#include "../../Codec/include/dif.h"
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "../../Codec/include/dif.h"
+
+int convert_to_ppm(const char *input_file, const char *output_file) {
+    char command[1024];
+    sprintf(command, "convert \"%s\" \"%s\"", input_file, output_file);
+
+    printf(">> Conversion automatique : %s -> %s\n", input_file, output_file);
+    int ret = system(command);
+
+    if (ret != 0) {
+        fprintf(stderr, "Erreur\n");
+    }
+    return ret;
+}
 
 long get_file_size(const char *filename) {
     FILE *f = fopen(filename, "rb");
-    if (!f) return 0;
+    if (!f)
+        return 0;
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
     fclose(f);
     return size;
 }
 
+static void launch_viewer(const char *program, const char *filename) {
+    if (!program)
+        return;
+    char command[1024];
+    sprintf(command, "%s \"%s\" &", program, filename);
+    system(command);
+}
+
+static int read_token(FILE *f, char *buf, size_t max_len) {
+    int c;
+    do {
+        c = fgetc(f);
+        if (c == '#') {
+            while (c != '\n' && c != EOF)
+                c = fgetc(f);
+        }
+    } while (c != EOF && isspace((unsigned char)c));
+
+    if (c == EOF)
+        return 1;
+
+    size_t i = 0;
+    while (c != EOF && !isspace((unsigned char)c)) {
+        if (i + 1 < max_len)
+            buf[i++] = (char)c;
+        c = fgetc(f);
+    }
+    buf[i] = '\0';
+    return 0;
+}
+
+long get_raw_pnm_size(const char *filename) {
+    FILE *f = fopen(filename, "rb");
+    if (!f)
+        return 0;
+
+    char token[64];
+
+    if (read_token(f, token, sizeof(token))) {
+        fclose(f);
+        return 0;
+    }
+    int channels = 0;
+    if (strcmp(token, "P5") == 0)
+        channels = 1;
+    else if (strcmp(token, "P6") == 0)
+        channels = 3;
+    else {
+        fclose(f);
+        return 0;
+    }
+
+    if (read_token(f, token, sizeof(token))) {
+        fclose(f);
+        return 0;
+    }
+    long width = strtol(token, NULL, 10);
+
+    if (read_token(f, token, sizeof(token))) {
+        fclose(f);
+        return 0;
+    }
+    long height = strtol(token, NULL, 10);
+
+    if (read_token(f, token, sizeof(token))) {
+        fclose(f);
+        return 0;
+    }
+    long maxval = strtol(token, NULL, 10);
+
+    fclose(f);
+
+    if (width <= 0 || height <= 0 || maxval != 255)
+        return 0;
+    return width * height * channels;
+}
+
 void print_help(const char *prog_name) {
-    printf("Usage: %s [options] <fichier>\n", prog_name);
+    printf("Usage: %s [options] <file1> [file2 ...]\n", prog_name);
     printf("Options:\n");
-    printf("  -h      Affiche cette aide\n");
-    printf("  -v      Mode verbeux (détails sur la console)\n");
-    printf("  -t      Mesure du temps d'exécution\n");
-    printf("Description:\n");
-    printf("  Si <fichier> est .dif -> Décompression vers .pnm\n");
-    printf("  Sinon (ex: .pgm, .ppm) -> Compression vers .dif\n");
+    printf("  -h          Aide\n");
+    printf("  -v          Mode verbeux\n");
+    printf("  -t          Chronomètre\n");
+    printf("  -x <prog>   Ouvrir avec un visualiseur après décodage (ex: -x "
+           "eog)\n");
+}
+
+static int process_file(const char *input, int verbose, int timer,
+                        const char *viewer) {
+    char output[1024];
+    char temp_ppm[1024] = "";
+
+    char *actual_source_file = (char *)input;
+    int needs_cleanup = 0;
+    int is_decoding = 0;
+    long ref_raw_size = 0;
+
+    char *ext = strrchr(input, '.');
+
+    if (ext && strcmp(ext, ".dif") == 0) {
+        is_decoding = 1;
+
+        strncpy(output, input, ext - input);
+        output[ext - input] = '\0';
+        strcat(output, ".pnm");
+
+        ref_raw_size = get_file_size(input);
+
+    } else {
+        is_decoding = 0;
+
+        int is_native =
+            (ext && (strcmp(ext, ".ppm") == 0 || strcmp(ext, ".pgm") == 0));
+
+        if (!is_native) {
+            sprintf(temp_ppm, "temp_%lx.ppm",
+                    (unsigned long)clock()); // Unique name
+
+            if (convert_to_ppm(input, temp_ppm) != 0)
+                return 1;
+
+            actual_source_file = temp_ppm;
+            needs_cleanup = 1;
+        }
+
+        ref_raw_size = get_raw_pnm_size(actual_source_file);
+
+        if (ext) {
+            strncpy(output, input, ext - input);
+            output[ext - input] = '\0';
+        } else {
+            strcpy(output, input);
+        }
+        strcat(output, ".dif");
+    }
+
+    if (verbose) {
+        printf("Mode   : %s\n", is_decoding ? "DÉCOMPRESSION" : "COMPRESSION");
+        printf("Entrée : %s\nSortie : %s\n", input, output);
+    }
+
+    clock_t start = clock();
+    int lib_ret = 0;
+
+    if (is_decoding) {
+        lib_ret = diftopnm(actual_source_file, output);
+    } else {
+        lib_ret = pnmtodif(actual_source_file, output);
+    }
+
+    clock_t end = clock();
+    double duration = ((double)(end - start)) / CLOCKS_PER_SEC;
+
+    if (lib_ret != 0) {
+        fprintf(stderr, "Echec sur %s (Code %d)\n", input, lib_ret);
+        if (needs_cleanup)
+            remove(temp_ppm);
+        return lib_ret;
+    }
+
+    if (verbose || timer) {
+        printf("--------------------------------\n");
+        if (timer)
+            printf("Temps : %.4f sec\n", duration);
+
+        long final_size = get_file_size(output);
+
+        if (ref_raw_size > 0) {
+            if (!is_decoding) {
+                float ratio = (float)final_size / ref_raw_size * 100.0f;
+                printf("Taille BRUTE : %ld octets\n", ref_raw_size);
+                printf("Taille DIF            : %ld octets\n", final_size);
+                printf("RATIO                 : %.2f%% (%.2f%% gain)\n", ratio,
+                       100.0f - ratio);
+            } else {
+                printf("Taille DIF (Entrée)   : %ld octets\n", ref_raw_size);
+                printf("Taille PNM (Sortie)   : %ld octets\n", final_size);
+            }
+        }
+        printf("Succès.\n\n");
+    }
+
+    if (is_decoding && viewer) {
+        if (verbose)
+            printf("Ouverture avec %s...\n", viewer);
+        launch_viewer(viewer, output);
+    }
+
+    if (needs_cleanup) {
+        remove(temp_ppm);
+    }
+
+    return 0;
 }
 
 int main(int argc, char *argv[]) {
@@ -32,7 +231,10 @@ int main(int argc, char *argv[]) {
 
     int verbose = 0;
     int timer = 0;
-    char *input_file = NULL;
+    const char *viewer = NULL;
+
+    const char *file_list[512];
+    int file_count = 0;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0) {
@@ -42,70 +244,31 @@ int main(int argc, char *argv[]) {
             verbose = 1;
         } else if (strcmp(argv[i], "-t") == 0) {
             timer = 1;
+        } else if (strcmp(argv[i], "-x") == 0) {
+            if (i + 1 < argc)
+                viewer = argv[++i];
+            else {
+                fprintf(stderr, "Erreur: -x nécessite un nom de programme.\n");
+                return 1;
+            }
         } else if (argv[i][0] != '-') {
-            input_file = argv[i];
+            if (file_count < 512)
+                file_list[file_count++] = argv[i];
         }
     }
 
-    if (!input_file) {
-        fprintf(stderr, "Erreur fichier\n");
+    if (file_count == 0) {
+        fprintf(stderr, "Erreur: Aucun fichier spécifié.\n");
         return 1;
     }
 
-    char output_file[256];
-    int is_decoding = 0;
-    char *ext = strrchr(input_file, '.');
+    int global_error = 0;
 
-    if (ext && strcmp(ext, ".dif") == 0) {
-        is_decoding = 1;
-        strncpy(output_file, input_file, ext - input_file);
-        output_file[ext - input_file] = '\0';
-        strcat(output_file, ".pnm");
-    } else {
-        if (ext) {
-            strncpy(output_file, input_file, ext - input_file);
-            output_file[ext - input_file] = '\0';
-        } else {
-            strcpy(output_file, input_file);
-        }
-        strcat(output_file, ".dif");
+    for (int k = 0; k < file_count; k++) {
+        int ret = process_file(file_list[k], verbose, timer, viewer);
+        if (ret != 0)
+            global_error = ret;
     }
 
-    if (verbose) {
-        printf("Mode: %s\n", is_decoding ? "DÉCOMPRESSION" : "COMPRESSION");
-        printf("Entrée: %s\nSortie: %s\n", input_file, output_file);
-    }
-
-    clock_t start = clock();
-    
-
-    if (is_decoding) {
-        diftopnm(input_file, output_file);
-    } else {
-        pnmtodif(input_file, output_file);
-    }
-
-    clock_t end = clock();
-    double time_taken = ((double)(end - start)) / CLOCKS_PER_SEC;
-
-    
-
-    if (verbose || timer) {
-        printf("--------------------------------\n");
-        if (timer) printf("Temps d'exécution : %.4f sec\n", time_taken);
-        
-        if (!is_decoding) {
-            long size_in = get_file_size(input_file);
-            long size_out = get_file_size(output_file);
-            if (size_in > 0) {
-                float ratio = (float)size_out / size_in * 100.0;
-                printf("Taille originale : %ld octets\n", size_in);
-                printf("Taille compressée: %ld octets\n", size_out);
-                printf("Ratio            : %.2f%% (%.2f%% gain)\n", ratio, 100.0 - ratio);
-            }
-        }
-        printf("Succès.\n");
-    }
-
-    return 0;
+    return global_error;
 }

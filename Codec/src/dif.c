@@ -202,7 +202,7 @@ int pnmtodif(const char *pnminput, const char *difoutput) {
     free(img_data);
 
     printf("Header écrit. Prêt pour l'encodage de %dx%d pixels.\n", width,
-           height); // Debug
+           height);
     flush_buffer(&bf);
     fwrite(bf.data, 1, bf.index, f_out);
     free(raw_data);
