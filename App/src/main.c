@@ -33,7 +33,10 @@ static void launch_viewer(const char *program, const char *filename) {
         return;
     char command[1024];
     sprintf(command, "%s \"%s\" &", program, filename);
-    system(command);
+    int a = system(command);
+    if (a != 0) {
+        fprintf(stderr, "Erreur %d\n", a);
+    }
 }
 
 static int read_token(FILE *f, char *buf, size_t max_len) {

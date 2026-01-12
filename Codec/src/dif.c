@@ -124,7 +124,7 @@ int pnmtodif(const char *pnminput, const char *difoutput) {
 
     unsigned short w = (unsigned short)width;
     unsigned short h = (unsigned short)height;
-    fwrite(&w, sizeof(unsigned short), 1, f_out); // [cite: 272]
+    fwrite(&w, sizeof(unsigned short), 1, f_out);
     fwrite(&h, sizeof(unsigned short), 1, f_out);
 
     unsigned char n_levels = 4;
@@ -156,7 +156,7 @@ int pnmtodif(const char *pnminput, const char *difoutput) {
         return 4;
     }
     if (fread(img_data, 1, num_pixels, f_in) != num_pixels) {
-        fprintf(stderr, "Erreur lecture : fichier image tronqué ou corrompu\n");
+        fprintf(stderr, "Erreur lecture : image corrompu\n");
         free(img_data);
         free(raw_data);
         fclose(f_in);
@@ -290,6 +290,7 @@ int diftopnm(const char *difinput, const char *pnmoutput) {
         fclose(f_in);
         return 2;
     }
+
     FILE *f_out = fopen(pnmoutput, "wb");
     if (!f_out) {
         perror("Erreur ouverture output PNM");
