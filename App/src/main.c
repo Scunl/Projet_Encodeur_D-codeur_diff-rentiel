@@ -147,7 +147,7 @@ static int process_file(const char *input, int verbose, int timer,
 
         if (!is_native) {
             sprintf(temp_ppm, "temp_%lx.ppm",
-                    (unsigned long)clock()); // Unique name
+                    (unsigned long)clock());
 
             if (convert_to_ppm(input, temp_ppm) != 0)
                 return 1;
