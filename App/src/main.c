@@ -7,7 +7,7 @@
 
 int convert_to_ppm(const char *input_file, const char *output_file) {
     char command[1024];
-    sprintf(command, "convert \"%s\" \"%s\"", input_file, output_file);
+    sprintf(command, "convert \"%s\" -strip \"%s\"", input_file, output_file);
 
     printf(">> Conversion automatique : %s -> %s\n", input_file, output_file);
     int ret = system(command);
@@ -272,6 +272,5 @@ int main(int argc, char *argv[]) {
         if (ret != 0)
             global_error = ret;
     }
-
     return global_error;
 }

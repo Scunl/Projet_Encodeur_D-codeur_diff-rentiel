@@ -1,8 +1,4 @@
 #include "../include/dif.h"
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 unsigned char fold_diff(int diff) {
     if (diff < 0)
@@ -16,31 +12,30 @@ int unfold_diff(unsigned char val) {
     return (int)val / 2;
 }
 
-static void skip_comments(FILE *f) {
+void skip_comments(FILE *f) {
     int ch;
     char buffer[1024];
+
     while ((ch = fgetc(f)) != EOF) {
         if (isspace(ch)) {
             continue;
         }
         if (ch == '#') {
             if (fgets(buffer, sizeof(buffer), f) == NULL)
-                return; // On sort si erreur lecture
+                return;
+            
+            continue;
+
         }
         ungetc(ch, f);
+        
         return;
     }
 }
 
-typedef struct {
-    unsigned char *data;
-    size_t index;
-    size_t size;
-    unsigned char wait;
-    int n_wait;
-} BitBuffer;
 
-static void init_buffer(BitBuffer *bf, unsigned char *ptr, size_t size) {
+
+void init_buffer(BitBuffer *bf, unsigned char *ptr, size_t size) {
     bf->data = ptr;
     bf->index = 0;
     bf->size = size;
@@ -48,7 +43,7 @@ static void init_buffer(BitBuffer *bf, unsigned char *ptr, size_t size) {
     bf->n_wait = 0;
 }
 
-static void push_bits(BitBuffer *bf, int val, int nb) {
+void push_bits(BitBuffer *bf, int val, int nb) {
     for (int i = nb - 1; i >= 0; i--) {
         int bit = (val >> i) & 1;
 
@@ -66,7 +61,7 @@ static void push_bits(BitBuffer *bf, int val, int nb) {
     }
 }
 
-static void flush_buffer(BitBuffer *bf) {
+void flush_buffer(BitBuffer *bf) {
     if (bf->n_wait > 0) {
         bf->wait = bf->wait << (8 - bf->n_wait);
 
@@ -78,7 +73,7 @@ static void flush_buffer(BitBuffer *bf) {
     }
 }
 
-int pnmtodif(const char *pnminput, const char *difoutput) {
+int pnmtodif(char *pnminput, char *difoutput) {
     FILE *f_in = NULL;
     FILE *f_out = NULL;
     char magic[3];
@@ -184,18 +179,13 @@ int pnmtodif(const char *pnminput, const char *difoutput) {
 
         unsigned char folded = fold_diff(diff);
 
-        int found = 0;
         for (int q = 0; q < 4; q++) {
             if (folded >= DifQuant[q].min && folded < DifQuant[q].max) {
                 push_bits(&bf, DifQuant[q].prefixe, DifQuant[q].lgprefixe);
                 int val_to_code = folded - DifQuant[q].offset;
                 push_bits(&bf, val_to_code, DifQuant[q].nb_bit);
-                found = 1;
                 break;
             }
-        }
-
-        if (!found) {
         }
     }
 
@@ -212,24 +202,17 @@ int pnmtodif(const char *pnminput, const char *difoutput) {
     return 0;
 }
 
-/*================================= ON PASSE A PULL BITS
- * =================================*/
+/*A changer en bas*/
 
-typedef struct {
-    const unsigned char *data;
-    size_t size;
-    size_t index;
-    int bit_pos;
-} BitReader;
 
-static void init_reader(BitReader *br, const unsigned char *data, size_t size) {
+void init_reader(BitReader *br, unsigned char *data, size_t size) {
     br->data = data;
     br->size = size;
     br->index = 0;
     br->bit_pos = 7;
 }
 
-static int pull_bit(BitReader *br) {
+int pull_bit(BitReader *br) {
     if (br->index >= br->size)
         return 0;
 
@@ -243,7 +226,7 @@ static int pull_bit(BitReader *br) {
     return bit;
 }
 
-static int pull_bits(BitReader *br, int nb) {
+int pull_bits(BitReader *br, int nb) {
     int val = 0;
     for (int i = 0; i < nb; i++) {
         val = (val << 1) | pull_bit(br);
@@ -251,7 +234,7 @@ static int pull_bits(BitReader *br, int nb) {
     return val;
 }
 
-int diftopnm(const char *difinput, const char *pnmoutput) {
+int diftopnm(char *difinput, char *pnmoutput) {
     FILE *f_in = fopen(difinput, "rb");
     if (!f_in) {
         perror("Erreur ouverture input DIF");
@@ -283,6 +266,8 @@ int diftopnm(const char *difinput, const char *pnmoutput) {
         fclose(f_in);
         return 2;
     }
+
+    printf("h %d w %d\n",h, w);
 
     unsigned char q_dummy[5];
     if (fread(q_dummy, 1, 5, f_in) != 5) {
