@@ -23,9 +23,7 @@ void skip_comments(FILE *f) {
         if (ch == '#') {
             if (fgets(buffer, sizeof(buffer), f) == NULL)
                 return;
-            
             continue;
-
         }
         ungetc(ch, f);
         
@@ -114,7 +112,7 @@ int pnmtodif(char *pnminput, char *difoutput) {
         return 1;
     }
 
-    unsigned short dif_magic = is_rgb ? 0xD3FF : 0xD1FF; // [cite: 269-271]
+    unsigned short dif_magic = is_rgb ? 0xD3FF : 0xD1FF;
     fwrite(&dif_magic, sizeof(unsigned short), 1, f_out);
 
     unsigned short w = (unsigned short)width;
@@ -123,14 +121,14 @@ int pnmtodif(char *pnminput, char *difoutput) {
     fwrite(&h, sizeof(unsigned short), 1, f_out);
 
     unsigned char n_levels = 4;
-    fwrite(&n_levels, sizeof(unsigned char), 1, f_out); // [cite: 274]
+    fwrite(&n_levels, sizeof(unsigned char), 1, f_out);
 
     unsigned char bits_per_level[4] = {1, 2, 4, 8};
     fwrite(bits_per_level, sizeof(unsigned char), 4, f_out);
 
     int num_layers = is_rgb ? 3 : 1;
     size_t num_pixels = (size_t)width * height * num_layers;
-    size_t buffer_size = (size_t)(1.375 * num_pixels) + 1024; // +marge sécu
+    size_t buffer_size = (size_t)(1.375 * num_pixels) + 1024;
 
     unsigned char *raw_data = malloc(buffer_size);
     if (!raw_data) {
@@ -144,14 +142,14 @@ int pnmtodif(char *pnminput, char *difoutput) {
 
     unsigned char *img_data = malloc(num_pixels);
     if (!img_data) {
-        perror("Erreur allocation image input");
+        perror("Erreur allocation image");
         free(raw_data);
         fclose(f_in);
         fclose(f_out);
         return 4;
     }
     if (fread(img_data, 1, num_pixels, f_in) != num_pixels) {
-        fprintf(stderr, "Erreur lecture : image corrompu\n");
+        fprintf(stderr, "Erreur lectureu\n");
         free(img_data);
         free(raw_data);
         fclose(f_in);
@@ -191,7 +189,7 @@ int pnmtodif(char *pnminput, char *difoutput) {
 
     free(img_data);
 
-    printf("Header écrit. Prêt pour l'encodage de %dx%d pixels.\n", width,
+    printf("Header écrit et l'encodage de %dx%d pixels.\n", width,
            height);
     flush_buffer(&bf);
     fwrite(bf.data, 1, bf.index, f_out);

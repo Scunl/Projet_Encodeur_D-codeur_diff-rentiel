@@ -9,7 +9,7 @@ int convert_to_ppm(const char *input_file, const char *output_file) {
     char command[1024];
     sprintf(command, "convert \"%s\" -strip \"%s\"", input_file, output_file);
 
-    printf(">> Conversion automatique : %s -> %s\n", input_file, output_file);
+    printf("Conversion avec convert : %s -> %s\n", input_file, output_file);
     int ret = system(command);
 
     if (ret != 0) {
@@ -28,7 +28,7 @@ long get_file_size(const char *filename) {
     return size;
 }
 
-static void launch_viewer(const char *program, const char *filename) {
+void launch_viewer(const char *program, const char *filename) {
     if (!program)
         return;
     char command[1024];
@@ -39,7 +39,7 @@ static void launch_viewer(const char *program, const char *filename) {
     }
 }
 
-static int read_token(FILE *f, char *buf, size_t max_len) {
+int read_token(FILE *f, char *buf, size_t max_len) {
     int c;
     do {
         c = fgetc(f);
@@ -118,7 +118,7 @@ void print_help(const char *prog_name) {
            "eog)\n");
 }
 
-static int process_file(const char *input, int verbose, int timer,
+int process_file(const char *input, int verbose, int timer,
                         const char *viewer) {
     char output[1024];
     char temp_ppm[1024] = "";
@@ -202,12 +202,12 @@ static int process_file(const char *input, int verbose, int timer,
             if (!is_decoding) {
                 float ratio = (float)final_size / ref_raw_size * 100.0f;
                 printf("Taille BRUTE : %ld octets\n", ref_raw_size);
-                printf("Taille DIF            : %ld octets\n", final_size);
-                printf("RATIO                 : %.2f%% (%.2f%% gain)\n", ratio,
+                printf("Taille DIF : %ld octets\n", final_size);
+                printf("RATIO : %.2f%% (%.2f%% gain)\n", ratio,
                        100.0f - ratio);
             } else {
-                printf("Taille DIF (Entrée)   : %ld octets\n", ref_raw_size);
-                printf("Taille PNM (Sortie)   : %ld octets\n", final_size);
+                printf("Taille DIF : %ld octets\n", ref_raw_size);
+                printf("Taille PNM : %ld octets\n", final_size);
             }
         }
         printf("Succès.\n\n");
