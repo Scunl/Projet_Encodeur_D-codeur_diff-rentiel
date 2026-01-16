@@ -1,15 +1,15 @@
 #include "../include/dif.h"
 
-unsigned char fold_diff(int diff) {
+int fold_diff(int diff) {
     if (diff < 0)
-        return (unsigned char)((-2) * diff) - 1;
-    return (unsigned char)2 * diff;
+        return ((-2) * diff) - 1;
+    return 2 * diff;
 }
 
-int unfold_diff(unsigned char val) {
+int unfold_diff(int val) {
     if (val % 2 == 1)
-        return -((int)val + 1) / 2;
-    return (int)val / 2;
+        return -(val + 1) / 2;
+    return val / 2;
 }
 
 void skip_comments(FILE *f) {
@@ -26,12 +26,10 @@ void skip_comments(FILE *f) {
             continue;
         }
         ungetc(ch, f);
-        
+
         return;
     }
 }
-
-
 
 void init_buffer(BitBuffer *bf, unsigned char *ptr, size_t size) {
     bf->data = ptr;
@@ -148,6 +146,7 @@ int pnmtodif(char *pnminput, char *difoutput) {
         fclose(f_out);
         return 4;
     }
+    
     if (fread(img_data, 1, num_pixels, f_in) != num_pixels) {
         fprintf(stderr, "Erreur lectureu\n");
         free(img_data);
@@ -175,8 +174,7 @@ int pnmtodif(char *pnminput, char *difoutput) {
 
         prev_reduced[chan] = val_reduite;
 
-        unsigned char folded = fold_diff(diff);
-
+        int folded = fold_diff(diff);
         for (int q = 0; q < 4; q++) {
             if (folded >= DifQuant[q].min && folded < DifQuant[q].max) {
                 push_bits(&bf, DifQuant[q].prefixe, DifQuant[q].lgprefixe);
@@ -189,8 +187,7 @@ int pnmtodif(char *pnminput, char *difoutput) {
 
     free(img_data);
 
-    printf("Header écrit et l'encodage de %dx%d pixels.\n", width,
-           height);
+    printf("Header écrit et l'encodage de %dx%d pixels.\n", width, height);
     flush_buffer(&bf);
     fwrite(bf.data, 1, bf.index, f_out);
     free(raw_data);
@@ -201,7 +198,6 @@ int pnmtodif(char *pnminput, char *difoutput) {
 }
 
 /*A changer en bas*/
-
 
 void init_reader(BitReader *br, unsigned char *data, size_t size) {
     br->data = data;
@@ -265,7 +261,7 @@ int diftopnm(char *difinput, char *pnmoutput) {
         return 2;
     }
 
-    printf("h %d w %d\n",h, w);
+    printf("h %d w %d\n", h, w);
 
     unsigned char q_dummy[5];
     if (fread(q_dummy, 1, 5, f_in) != 5) {
@@ -353,7 +349,7 @@ int diftopnm(char *difinput, char *pnmoutput) {
 
         int folded = val_code + DifQuant[q_index].offset;
 
-        int diff = unfold_diff((unsigned char)folded);
+        int diff = unfold_diff((signed char)folded);
 
         int val_reduite = prev_reduced[chan] + diff;
 
